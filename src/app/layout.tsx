@@ -61,6 +61,14 @@ export const metadata: Metadata = {
   authors: [{ name: 'Prodi Teknik Informatika UIKA Bogor' }],
   creator: 'TI UIKA Bogor',
   robots: 'index, follow',
+  icons: {
+    icon: [
+      { url: '/icon.webp', type: 'image/webp' },
+      { url: '/favicon.webp', type: 'image/webp' },
+    ],
+    shortcut: '/icon.webp',
+    apple: '/icon.webp',
+  },
 };
 
 export default function RootLayout({
