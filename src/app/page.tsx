@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, useInView } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -907,9 +907,8 @@ function CliRecommender() {
     });
   }
 
-  function handleCommandSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const cmd = commandInput.trim().toLowerCase();
+  const executeCommand = useCallback((rawCmd: string) => {
+    const cmd = rawCmd.trim().toLowerCase();
     if (!cmd) return;
 
     let output: React.ReactNode = null;
@@ -922,22 +921,22 @@ function CliRecommender() {
       output = (
         <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
           Available commands:{' '}
-          <span style={{ color: isLight ? '#047857' : '#3ad389' }}>help</span>,{' '}
-          <span style={{ color: isLight ? '#047857' : '#3ad389' }}>ls</span>,{' '}
-          <span style={{ color: isLight ? '#047857' : '#3ad389' }}>clear</span>,{' '}
-          <span style={{ color: isLight ? '#1d4ed8' : '#70b8ff' }}>se</span>,{' '}
-          <span style={{ color: isLight ? '#1d4ed8' : '#70b8ff' }}>csn</span>,{' '}
-          <span style={{ color: isLight ? '#1d4ed8' : '#70b8ff' }}>git</span>,{' '}
-          <span style={{ color: isLight ? '#1d4ed8' : '#70b8ff' }}>keris</span>
+          <span style={{ color: isLight ? '#047857' : '#3ad389', fontWeight: 600 }}>help</span>,{' '}
+          <span style={{ color: isLight ? '#047857' : '#3ad389', fontWeight: 600 }}>ls</span>,{' '}
+          <span style={{ color: isLight ? '#047857' : '#3ad389', fontWeight: 600 }}>clear</span>,{' '}
+          <span style={{ color: isLight ? '#1d4ed8' : '#70b8ff', fontWeight: 600 }}>se</span>,{' '}
+          <span style={{ color: isLight ? '#1d4ed8' : '#70b8ff', fontWeight: 600 }}>csn</span>,{' '}
+          <span style={{ color: isLight ? '#1d4ed8' : '#70b8ff', fontWeight: 600 }}>git</span>,{' '}
+          <span style={{ color: isLight ? '#1d4ed8' : '#70b8ff', fontWeight: 600 }}>keris</span>
         </div>
       );
     } else if (cmd === 'ls') {
       output = (
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', color: 'var(--terminal-text)', fontSize: '12px' }}>
-          <span style={{ color: isLight ? '#6d28d9' : '#9281f7', fontWeight: 500 }}>se/</span>
-          <span style={{ color: isLight ? '#059669' : '#70b8ff', fontWeight: 500 }}>csn/</span>
-          <span style={{ color: isLight ? '#d97706' : '#3ad389', fontWeight: 500 }}>git/</span>
-          <span style={{ color: isLight ? '#9333ea' : '#ffca16', fontWeight: 500 }}>keris/</span>
+          <span style={{ color: isLight ? '#2563eb' : '#9281f7', fontWeight: 600 }}>se/</span>
+          <span style={{ color: isLight ? '#059669' : '#70b8ff', fontWeight: 600 }}>csn/</span>
+          <span style={{ color: isLight ? '#d97706' : '#3ad389', fontWeight: 600 }}>git/</span>
+          <span style={{ color: isLight ? '#9333ea' : '#ffca16', fontWeight: 600 }}>keris/</span>
         </div>
       );
     } else if (['se', 'csn', 'git', 'keris'].includes(cmd)) {
@@ -948,7 +947,7 @@ function CliRecommender() {
           : match.accentColor;
         output = (
           <div style={{ fontSize: '12px', color: 'var(--terminal-text)' }}>
-            <span style={{ color: labColor, fontWeight: 500 }}>[{match.name}]</span> {match.fullName} — {match.motto}
+            <span style={{ color: labColor, fontWeight: 600 }}>[{match.name}]</span> {match.fullName} — {match.motto}
             <div style={{ marginTop: '4px' }}>
               <Link href={`/lab/${match.slug}`} style={{ color: isLight ? '#047857' : '#3ad389', textDecoration: 'underline' }}>
                 Open /lab/{match.slug} &rarr;
@@ -965,12 +964,61 @@ function CliRecommender() {
       );
     }
 
-    setCliHistory((prev) => [...prev, { cmd: commandInput, output }]);
+    setCliHistory((prev) => [...prev, { cmd: rawCmd, output }]);
     setCommandInput('');
-  }
+  }, [isLight]);
+
+  const hasTypedDemo = useRef(false);
+  const userHasInteracted = useRef(false);
+  const [isDemoTyping, setIsDemoTyping] = useState(false);
 
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
+
+  // Auto-typing simulation when the terminal enters the viewport
+  useEffect(() => {
+    if (!inView || hasTypedDemo.current || userHasInteracted.current) return;
+    hasTypedDemo.current = true;
+
+    const demoCmd = 'help';
+    let i = 0;
+
+    const initialDelay = setTimeout(() => {
+      if (userHasInteracted.current) return;
+      setIsDemoTyping(true);
+
+      const typeTimer = setInterval(() => {
+        if (userHasInteracted.current) {
+          clearInterval(typeTimer);
+          setIsDemoTyping(false);
+          return;
+        }
+
+        i++;
+        setCommandInput(demoCmd.slice(0, i));
+
+        if (i >= demoCmd.length) {
+          clearInterval(typeTimer);
+          setTimeout(() => {
+            if (userHasInteracted.current) {
+              setIsDemoTyping(false);
+              return;
+            }
+            executeCommand(demoCmd);
+            setIsDemoTyping(false);
+          }, 450);
+        }
+      }, 140);
+    }, 700);
+
+    return () => clearTimeout(initialDelay);
+  }, [inView, executeCommand]);
+
+  function handleCommandSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    userHasInteracted.current = true;
+    executeCommand(commandInput);
+  }
 
   return (
     <section
@@ -1194,15 +1242,59 @@ function CliRecommender() {
                 </div>
               ))}
 
-              <form onSubmit={handleCommandSubmit} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                <span style={{ color: 'var(--terminal-cmd, #3ad389)', fontFamily: 'var(--font-mono)', fontSize: '12px', userSelect: 'none' }}>
+              {/* Interactive Prompt Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ 
+                    display: 'inline-block', 
+                    width: '6px', 
+                    height: '6px', 
+                    borderRadius: '50%', 
+                    backgroundColor: isLight ? '#059669' : '#3ad389',
+                    boxShadow: isLight ? '0 0 6px rgba(5, 150, 105, 0.4)' : '0 0 8px rgba(58, 211, 137, 0.6)'
+                  }} />
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontFamily: 'var(--font-mono)', 
+                    color: isLight ? '#0f766e' : '#3ad389', 
+                    letterSpacing: '0.04em',
+                    fontWeight: 600
+                  }}>
+                    {isDemoTyping ? 'SIMULASI KETIK AKTIF...' : 'CLI INTERAKTIF • KETIK SENDIRI DI BAWAH'}
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-faint)' }}>
+                  Perintah: <code style={{ color: isLight ? '#047857' : '#3ad389', fontWeight: 600 }}>help</code>, <code style={{ color: isLight ? '#047857' : '#3ad389', fontWeight: 600 }}>ls</code>, <code style={{ color: isLight ? '#047857' : '#3ad389', fontWeight: 600 }}>csn</code>, <code style={{ color: isLight ? '#047857' : '#3ad389', fontWeight: 600 }}>se</code>, <code style={{ color: isLight ? '#047857' : '#3ad389', fontWeight: 600 }}>clear</code>
+                </span>
+              </div>
+
+              <form
+                onSubmit={handleCommandSubmit}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  background: isLight ? 'rgba(241, 245, 249, 0.75)' : 'rgba(15, 23, 42, 0.45)',
+                  border: isLight ? '1px solid rgba(203, 213, 225, 0.85)' : '1px solid rgba(58, 211, 137, 0.25)',
+                  borderRadius: '6px',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+              >
+                <span style={{ color: 'var(--terminal-cmd, #3ad389)', fontFamily: 'var(--font-mono)', fontSize: '12px', userSelect: 'none', fontWeight: 600 }}>
                   guest@uika:~$
                 </span>
                 <input
                   type="text"
                   value={commandInput}
-                  onChange={(e) => setCommandInput(e.target.value)}
-                  placeholder="type 'help', 'ls', 'se', 'csn', 'git', 'keris', 'clear'"
+                  onChange={(e) => {
+                    userHasInteracted.current = true;
+                    setCommandInput(e.target.value);
+                  }}
+                  onFocus={() => {
+                    userHasInteracted.current = true;
+                  }}
+                  placeholder={isDemoTyping ? "Memulai simulasi ketik..." : "Ketik 'help', 'ls', 'csn', 'se', 'git', 'keris' lalu tekan Enter..."}
                   aria-label="Terminal command input"
                   style={{
                     flex: 1,
@@ -1214,6 +1306,7 @@ function CliRecommender() {
                     color: 'var(--terminal-text, #f0f0f0)',
                   }}
                 />
+                <span className="terminal-cursor-block" style={{ width: '7px', height: '14px' }} />
               </form>
             </div>
           </TerminalWindow>
