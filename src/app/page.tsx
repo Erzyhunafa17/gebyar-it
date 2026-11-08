@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, useInView } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -972,6 +972,43 @@ function CliRecommender() {
   const userHasInteracted = useRef(false);
   const [isDemoTyping, setIsDemoTyping] = useState(false);
 
+  // Rotating placeholder suggestions so commands remain permanently visible and animated
+  const placeholderSuggestions = useMemo(() => [
+    "Ketik 'help' untuk panduan daftar perintah...",
+    "Ketik 'ls' untuk melihat direktori laboratorium...",
+    "Ketik 'csn' untuk profil Lab Computing & Network...",
+    "Ketik 'se' untuk profil Lab Software Engineering...",
+    "Ketik 'git' untuk profil Lab Geospasial...",
+    "Ketik 'keris' untuk profil Lab Artificial Intelligence...",
+    "Ketik 'clear' untuk membersihkan layar terminal...",
+  ], []);
+
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % placeholderSuggestions.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [placeholderSuggestions.length]);
+
+  const replayDemo = useCallback((cmdToRun = 'help') => {
+    setIsDemoTyping(true);
+    setCommandInput('');
+    let i = 0;
+    const typeTimer = setInterval(() => {
+      i++;
+      setCommandInput(cmdToRun.slice(0, i));
+      if (i >= cmdToRun.length) {
+        clearInterval(typeTimer);
+        setTimeout(() => {
+          executeCommand(cmdToRun);
+          setIsDemoTyping(false);
+        }, 400);
+      }
+    }, 120);
+  }, [executeCommand]);
+
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
@@ -1294,7 +1331,7 @@ function CliRecommender() {
                   onFocus={() => {
                     userHasInteracted.current = true;
                   }}
-                  placeholder={isDemoTyping ? "Memulai simulasi ketik..." : "Ketik 'help', 'ls', 'csn', 'se', 'git', 'keris' lalu tekan Enter..."}
+                  placeholder={isDemoTyping ? "Memulai simulasi ketik..." : placeholderSuggestions[placeholderIndex]}
                   aria-label="Terminal command input"
                   style={{
                     flex: 1,
@@ -1308,6 +1345,88 @@ function CliRecommender() {
                 />
                 <span className="terminal-cursor-block" style={{ width: '7px', height: '14px' }} />
               </form>
+
+              {/* Persistent Clickable Command Chips — always visible throughout user session */}
+              <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-faint)', userSelect: 'none', marginRight: '2px' }}>
+                  Aksi Cepat:
+                </span>
+                {[
+                  { cmd: 'help', label: '⚡ help', color: isLight ? '#059669' : '#3ad389' },
+                  { cmd: 'ls', label: '📁 ls', color: isLight ? '#2563eb' : '#70b8ff' },
+                  { cmd: 'se', label: '💻 se', color: isLight ? '#2563eb' : '#9281f7' },
+                  { cmd: 'csn', label: '🌐 csn', color: isLight ? '#059669' : '#3ad389' },
+                  { cmd: 'git', label: '🗺️ git', color: isLight ? '#d97706' : '#ffca16' },
+                  { cmd: 'keris', label: '🤖 keris', color: isLight ? '#9333ea' : '#d946ef' },
+                  { cmd: 'clear', label: '🧹 clear', color: 'var(--text-muted)' },
+                ].map((item) => (
+                  <button
+                    key={item.cmd}
+                    type="button"
+                    onClick={() => {
+                      userHasInteracted.current = true;
+                      executeCommand(item.cmd);
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 9px',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      borderRadius: '5px',
+                      background: isLight ? 'rgba(241, 245, 249, 0.95)' : 'rgba(30, 41, 59, 0.65)',
+                      border: `1px solid ${isLight ? 'rgba(203, 213, 225, 0.9)' : 'rgba(255, 255, 255, 0.12)'}`,
+                      color: item.color,
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
+                      (e.currentTarget as HTMLElement).style.borderColor = item.color;
+                      (e.currentTarget as HTMLElement).style.background = isLight ? 'rgba(226, 232, 240, 1)' : 'rgba(30, 41, 59, 0.95)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                      (e.currentTarget as HTMLElement).style.borderColor = isLight ? 'rgba(203, 213, 225, 0.9)' : 'rgba(255, 255, 255, 0.12)';
+                      (e.currentTarget as HTMLElement).style.background = isLight ? 'rgba(241, 245, 249, 0.95)' : 'rgba(30, 41, 59, 0.65)';
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => replayDemo('help')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 9px',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                    borderRadius: '5px',
+                    background: 'transparent',
+                    border: '1px dashed var(--text-faint)',
+                    color: 'var(--text-faint)',
+                    cursor: 'pointer',
+                    marginLeft: 'auto',
+                    transition: 'color 0.15s ease, border-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.borderColor = isLight ? '#059669' : '#3ad389';
+                    (e.currentTarget as HTMLElement).style.color = isLight ? '#059669' : '#3ad389';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--text-faint)';
+                    (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+                  }}
+                  title="Putar ulang simulasi ketik otomatis"
+                >
+                  ↺ Ulangi Demo
+                </button>
+              </div>
             </div>
           </TerminalWindow>
         </motion.div>
@@ -1318,6 +1437,14 @@ function CliRecommender() {
 
 /** ── Page Root ── */
 export default function HomePage() {
+  useEffect(() => {
+    // Reset scroll restoration so refreshing the page always lands at the top of Home
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
+
   return (
     <>
       <div className="navbar-offset" />

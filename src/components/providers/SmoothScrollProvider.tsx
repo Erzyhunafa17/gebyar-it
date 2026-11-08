@@ -15,6 +15,12 @@ export default function SmoothScrollProvider({
   const lenisRef = useRef<Lenis | null>(null);
 
   useEffect(() => {
+    // Reset scroll position on refresh/load so user always starts at the top
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+
     // Respect prefers-reduced-motion — skip Lenis if user prefers no motion
     const prefersReducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)'
@@ -31,6 +37,7 @@ export default function SmoothScrollProvider({
     });
 
     lenisRef.current = lenis;
+    lenis.scrollTo(0, { immediate: true });
 
     function raf(time: number) {
       lenis.raf(time);
